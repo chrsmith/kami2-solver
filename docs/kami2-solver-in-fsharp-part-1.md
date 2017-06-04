@@ -84,3 +84,9 @@ paint.Color = new SKColor(0x42uy, 0x81uy, 0xA4uy)
 
 But for integer literals, why not automatically convert them to other types if no suffix
 is specified? e.g. 1 can be treated as 1L, 1ul, 1uy, etc.
+
+## Next steps
+
+Now that we have the puzzle analyzed and in a graph representation, the next step is to
+actually write a solver. You could call that AI artifical intelligence, but without all
+the big data learning marketing-speak.

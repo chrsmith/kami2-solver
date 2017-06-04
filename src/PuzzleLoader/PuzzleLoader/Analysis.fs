@@ -17,7 +17,7 @@ let solidColors = [|
     for r = 0 to 2 do
         for g = 0 to 2 do
             for b = 0 to 2 do
-                let byteValue x = 128uy * (byte x)
+                let byteValue x = 127uy * (byte x)
                 yield new SKColor(byteValue r, byteValue g, byteValue b, 255uy)
 |]
 
@@ -61,6 +61,15 @@ let getTrianglePoint col row =
     (x, y)
 
 
+// Returns the approximate center of the i'th color swatch, if there are n swatches
+// in total.
+let getPuzzleColorPoint i numColors =
+    let colorSwatchWidth = kColorPaletWidth / (float32 numColors)
+    let x = kColorPaletXOffset + (float32 i) * colorSwatchWidth + colorSwatchWidth / 2.0f
+    let y = kGridHeight + kGameFooter / 2.0f
+    (x, y)
+
+
 // Returns the col/row positions of adjacent triangles. If the game
 // were a square grid, it would be col and col +/- 1. Instead, we
 // need to do some work.
@@ -90,6 +99,19 @@ let dotProduct colorA colorB =
     let vecA = colorToNormVec colorA
     let vecB = colorToNormVec colorB    
     Array.fold2 (fun acc x y -> acc + x * y) 0.0 vecA vecB
+
+
+// Returns whether or not every color in the sequence is unique within a tolerance.
+let allUnique (colors : SKColor[]) =
+    // BUG? This seems unreasonablly high, but is necessary in practice.
+    let kTolerance = 0.99
+    let mutable allColorsUnique = true
+    for i = 0 to colors.Length - 2 do
+        for j = i + 1 to colors.Length - 1 do
+            let similarity = dotProduct colors.[i] colors.[j]
+            if similarity > kTolerance then
+                allColorsUnique <- false
+    allColorsUnique
 
 
 // Returns the average SKPixel value for those near the given point.
@@ -225,23 +247,24 @@ let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
                         kGridWidth, rowStartY,
                         kBlack)
 
-    // Get the puzzle's colors and mark them on the analyzed image.
+    // Determine the number of colors used by the puzzle. We assume there are 5, and
+    // whittle that number down if we detect duplicates. Marking the regions we used
+    // for determiniation along the way.
     let puzzleColors : SKColor[] =
-        // TODO(chrsmith): Do some better logic here. Maybe start with 10
-        // colors and whittle them down till all are unique?
-        let puzzleColorsUsed = 5
-        let colorSwatchWidth = kColorPaletWidth / (float32 puzzleColorsUsed)
-
-        // Get the average SKColor representing the ith puzzle color.
-        let getPuzzleColor i =
-            let x = kColorPaletXOffset + (float32 i) * colorSwatchWidth + colorSwatchWidth / 2.0f
-            let y = kGridHeight + kGameFooter / 2.0f
-            let color = getColorAverage bitmap x y
-            debugImage.AddCircle(x, y, color)
-            debugImage.AddCircleOutline(x, y, kMagenta)
-            color
-
-        Array.init puzzleColorsUsed getPuzzleColor
+        seq { 5 .. -1 .. 2 }
+        |> Seq.map (fun numColors ->
+            let getColorAtIdx idx =
+                let (x, _) = getPuzzleColorPoint idx numColors
+                // Adjust the X value so it isn't inbetween two different colors.
+                let x = x - 20.0f
+                // Adjust the Y value so that debugging annotations don't overlap.
+                let y = kGridHeight + (kGameFooter / 6.0f) * (float32 (5 - numColors)) + 40.0f
+                let color = getColorAverage bitmap x y
+                debugImage.AddCircle(x, y, color)
+                debugImage.AddCircleOutline(x, y, solidColors.[numColors])
+                color
+            Array.init numColors getColorAtIdx)
+        |> Seq.find allUnique
 
     // Get the inferred index of the color correspoding to the triangle at the
     // given column and row.
@@ -319,10 +342,14 @@ let ExtractPuzzle imageFilePath =
                     Color = rawData.Triangles.[col, row]
                     AdjacentRegions = new HashSet<int>()
                 }
-                floodFillRegion col row newRegion
                 knownRegions.Add(newRegion)
+                floodFillRegion col row newRegion
 
-    debugImage.Save("demo.png")
+
+    // Save our marked up puzzle.
+    let sourceImageDir = Path.GetDirectoryName(imageFilePath)
+    let sourceImageName = Path.GetFileNameWithoutExtension(imageFilePath)
+    debugImage.Save(Path.Combine(sourceImageDir, sourceImageName + ".analyzed.png"))
 
     {
         NumColors = rawData.NumColors
