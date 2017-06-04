@@ -143,7 +143,6 @@ let loadKamiPuzzleImage filePath =
 
 // Kami2 puzzle image with annotations to aid in debugging.
 type AnalysisDebugImage(originalImage : SKBitmap) =
-    // Surface for the debugging annotations.
     let surface = SKSurface.Create(originalImage.Width,
                                    originalImage.Height,
                                    SKImageInfo.PlatformColorType,
@@ -154,17 +153,7 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
                             Color = kBlack,
                             StrokeWidth = 5.0f)
 
-    let init() =
-        // Draw the original puzzle image.
-        canvas.DrawColor(SKColors.White)
-        canvas.DrawBitmap(originalImage, 0.0f, 0.0f, paint)
-
-        // Draw a watermark.
-        paint.IsStroke <- false
-        paint.Color <- kMagenta
-        canvas.DrawText("Kami2 Solver", 8.0f, kGridHeight + 128.0f, paint)
-
-    do init()
+    do canvas.DrawBitmap(originalImage, 0.0f, 0.0f, paint)
 
     member this.DrawLine(x0, y0, x1, y1, color) =
         paint.Color <- color
@@ -175,16 +164,14 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
         paint.Color <- color
         canvas.DrawCircle(
             x, y, kAnnotationSize,
-            paint
-        )
+            paint)
 
     member this.AddCircleOutline(x, y, color) =
         paint.IsStroke <- true
         paint.Color <- color
         canvas.DrawCircle(
             x, y, kAnnotationSize,
-            paint
-        )
+            paint)
 
     // Save the image to disk in the PNG format.
     member this.Save(filePath) =
@@ -192,7 +179,7 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
         use pngEncodedFile = finalImage.Encode();
         File.WriteAllBytes(filePath, pngEncodedFile.ToArray())
 
-    // Clean up SKia objects.
+    // Clean up Skia objects.
     interface IDisposable with
         member __.Dispose() =
             paint.Dispose()
@@ -212,8 +199,6 @@ type RawKami2Puzzle = {
 
 
 // Kami2 puzzle represented as a graph.
-// TOOD(chrsmith): How to make these mutable for building?
-// RegionBuilder and Region?
 type Region = {
     ID: int
     Color: int
@@ -224,10 +209,12 @@ type Region = {
         this.AdjacentRegions.Add(adjacentRegion.ID) |> ignore
         adjacentRegion.AdjacentRegions.Add(this.ID) |> ignore
 
+
 type Kami2Puzzle = {
     NumColors: int
     Regions: List<Region>
 }
+
 
 // Analyze a screen shot of a Kami2 puzzle and convert it into a RawKami2Puzzle
 // object. Also creates an annotated copy of the image for debugging purposes.
@@ -314,13 +301,12 @@ let ExtractPuzzle imageFilePath =
 
     let rec floodFillRegion col row (region : Region) =
         match triangleRegions.[col, row] with
-        // If the triangle's neighbor is a well-known region, then we stop
-        // recursing. (Even if that region is the current region being filled.)
+        // If the triangle's neighbor is already known, mark as neighbor and stop.
         | Some(adjacentRegion) ->
             region.AddAdjacentRegion(adjacentRegion)
         // If the adjacent triangle does not have a region, then we merge it
-        // into the region being flooed filled if it has the same color, otherwise
-        // we ignore it. (And will "get to it" later.)
+        // into the region being flood filled if it has the same color,
+        // otherwise we ignore it. (And will get to it later.)
         | None ->
             let triangleColor = rawData.Triangles.[col, row]
             if triangleColor = region.Color then
@@ -339,6 +325,7 @@ let ExtractPuzzle imageFilePath =
                 // of a different region constructed later.
                 ()
 
+    // Check each triangle and ensure it is apart of a region.
     for col = 0 to 9 do
         for row = 0 to 28 do
             let triangleColor = rawData.Triangles.[col, row]
