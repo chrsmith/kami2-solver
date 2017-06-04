@@ -157,14 +157,11 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
         canvas.DrawColor(SKColors.White)
         canvas.DrawBitmap(originalImage, 0.0f, 0.0f, paint)
 
-        // Draw a watermark, outlined.
+        // Draw a watermark.
+        paint.IsStroke <- false
         paint.Color <- kMagenta
         canvas.DrawText("Kami2 Solver", 8.0f, kGridHeight + 128.0f, paint)
 
-        paint.IsStroke <- true
-        paint.Color <- kWhite
-        canvas.DrawText("Kami2 Solver", 8.0f, kGridHeight + 128.0f, paint)
-        paint.IsStroke <- false
     do init()
 
     member this.DrawLine(x0, y0, x1, y1, color) =
