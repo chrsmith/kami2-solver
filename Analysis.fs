@@ -11,6 +11,7 @@ let kBlack = new SKColor(0uy, 0uy, 0uy, 255uy)
 let kMagenta = new SKColor(200uy, 0uy, 200uy, 255uy)
 let kWhite = new SKColor(255uy, 255uy, 255uy, 255uy)
 
+
 // Array of solid colors. Used to have a set of pre-defined
 // colors for annotating distinct regions of the puzzle.
 let solidColors = [|
@@ -43,6 +44,9 @@ let kRowHeight = kGridHeight / 28.0f
 // Size of annotations in the debug image.
 let kAnnotationSize = 22.0f
 
+// Similiarty between two colors to be considered a match.
+// BUG? This seems unreasonablly high, but is necessary in practice.
+let kColorMatchThreshold = 0.99
 
 // Returns the approximate center of the triangle at the col and row.
 // The result are pixels into the original image.
@@ -103,13 +107,11 @@ let dotProduct colorA colorB =
 
 // Returns whether or not every color in the sequence is unique within a tolerance.
 let allUnique (colors : SKColor[]) =
-    // BUG? This seems unreasonablly high, but is necessary in practice.
-    let kTolerance = 0.99
     let mutable allColorsUnique = true
     for i = 0 to colors.Length - 2 do
         for j = i + 1 to colors.Length - 1 do
             let similarity = dotProduct colors.[i] colors.[j]
-            if similarity > kTolerance then
+            if similarity > kColorMatchThreshold then
                 allColorsUnique <- false
     allColorsUnique
 
@@ -204,6 +206,7 @@ type RawKami2Puzzle = {
     NumColors: int
     // Index of the color of each individual triagle. See other comments for
     // translating coordinates to triangles, and adjacency rules.
+    // Has value of -1 if the triangle doesn't match any puzzle colors.
     Triangles: int[,]
 }
 
@@ -255,7 +258,7 @@ let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
                 // Adjust the X value so it isn't inbetween two different colors.
                 let x = x - 20.0f
                 // Adjust the Y value so that debugging annotations don't overlap.
-                let y = kGridHeight + (kGameFooter / 6.0f) * (float32 (5 - numColors)) + 40.0f
+                let y = kGridHeight + (kGameFooter / 4.0f) * (float32 (5 - numColors)) + 40.0f
                 let color = getColorAverage bitmap x y
                 debugImage.AddCircle(x, y, color)
                 debugImage.AddCircleOutline(x, y, solidColors.[numColors])
@@ -268,12 +271,19 @@ let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
     let getTriangleColor col row =
         let x, y = getTrianglePoint col row
         let triangleColor = getColorAverage bitmap x y
-        debugImage.AddCircle(x, y, triangleColor)
 
-        puzzleColors
-        |> Seq.mapi (fun idx puzzleColor -> (idx, dotProduct triangleColor puzzleColor))
-        |> Seq.maxBy snd
-        |> fst
+        let (colorIdx, similarity) =
+            puzzleColors
+            |> Seq.mapi (fun idx puzzleColor -> (idx, dotProduct triangleColor puzzleColor))
+            |> Seq.maxBy snd
+
+        // If the triangle's color doesn't closely match a puzzle color, assume it is
+        // fixed. (i.e. blank space in some puzzles.)
+        if similarity > kColorMatchThreshold then
+            debugImage.AddCircle(x, y, triangleColor)
+            colorIdx
+        else
+            -1
 
     {
         NumColors = puzzleColors.Length
@@ -331,12 +341,16 @@ let ExtractPuzzle imageFilePath =
 
     for col = 0 to 9 do
         for row = 0 to 28 do
+            let triangleColor = rawData.Triangles.[col, row]
             match triangleRegions.[col, row] with
+            // Ignore triangles already associated with a region or
+            // not part of the puzzle.
             | Some(_) -> ()
+            | _ when triangleColor = -1 -> ()
             | None ->
                 let newRegion = {
                     ID = knownRegions.Count
-                    Color = rawData.Triangles.[col, row]
+                    Color = triangleColor
                     AdjacentRegions = new HashSet<int>()
                 }
                 knownRegions.Add(newRegion)
