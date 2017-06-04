@@ -11,6 +11,16 @@ let kBlack = new SKColor(0uy, 0uy, 0uy, 255uy)
 let kMagenta = new SKColor(200uy, 0uy, 200uy, 255uy)
 let kWhite = new SKColor(255uy, 255uy, 255uy, 255uy)
 
+// Array of solid colors. Used to have a set of pre-defined
+// colors for annotating distinct regions of the puzzle.
+let solidColors = [|
+    for r = 0 to 2 do
+        for g = 0 to 2 do
+            for b = 0 to 2 do
+                let byteValue x = 128uy * (byte x)
+                yield new SKColor(byteValue r, byteValue g, byteValue b, 255uy)
+|]
+
 
 // Values in pixels for the dimensions of things. These are hard-coded
 // to the images I'm generating on my phone, which might vary between
@@ -49,6 +59,23 @@ let getTrianglePoint col row =
     let x = (col |> float32) * kColWidth + kColWidth / 2.0f + colShift
     let y = (row |> float32) * kRowHeight + rowShift
     (x, y)
+
+
+// Returns the col/row positions of adjacent triangles. If the game
+// were a square grid, it would be col and col +/- 1. Instead, we
+// need to do some work.
+let getAdjacentTriangles col row =
+    seq {
+        // You always have a triangle above/below you, except on edges.
+        if row > 0 then yield (col, row - 1)
+        if row < 28 then yield (col, row + 1)
+        // You only have one neighbor to the left or right, depending
+        // on which row/col you are in.
+        let a = row + col % 2
+        if a % 2 = 0 && col > 0 then yield (col - 1, row)
+        if a % 2 = 1 && col < 9 then yield (col + 1, row)
+    }
+
 
 // Computes the dot product of the two colors as if they were
 // normalized vectors.
@@ -162,14 +189,27 @@ type RawKami2Puzzle = {
 }
 
 
+// Kami2 puzzle represented as a graph.
+// TOOD(chrsmith): How to make these mutable for building?
+// RegionBuilder and Region?
+type Region = {
+    ID: int
+    Color: int
+    // IDs of adjacent regions
+    AdjacentRegions: HashSet<int>
+} with
+    member this.AddAdjacentRegion(adjacentRegion : Region) =
+        this.AdjacentRegions.Add(adjacentRegion.ID) |> ignore
+        adjacentRegion.AdjacentRegions.Add(this.ID) |> ignore
+
+type Kami2Puzzle = {
+    NumColors: int
+    Regions: List<Region>
+}
+
 // Analyze a screen shot of a Kami2 puzzle and convert it into a RawKami2Puzzle
 // object. Also creates an annotated copy of the image for debugging purposes.
-let AnalyzePuzzleImage filePath =
-    // Load the puzzle image.
-    use bitmap = loadKamiPuzzleImage filePath
-   
-    use debugImage = new AnalysisDebugImage(bitmap)
-
+let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
     // Draw guiding lines for rows and columns.
     for col = 0 to 9 do
         let colf = col |> float32
@@ -215,10 +255,76 @@ let AnalyzePuzzleImage filePath =
         |> Seq.maxBy snd
         |> fst
 
-    let puzzleInfo = {
+    {
         NumColors = puzzleColors.Length
         Triangles = Array2D.init 10 29 getTriangleColor
     }
 
+
+// Extract a Kami2Puzzle object from an in-game screenshot.
+let ExtractPuzzle imageFilePath =
+    use bitmap = loadKamiPuzzleImage imageFilePath
+    use debugImage = new AnalysisDebugImage(bitmap)
+
+    // Get the colors of each triangle.
+    let rawData = AnalyzePuzzleImage bitmap debugImage
+
+    // Convert individual triangles into "regions". This is done by:
+    // 1.) Build a parallel array mapping each triangle to its Region.
+    //     Nulled out to start.
+    // 2.) Pick the first triangle that doesn't have a region associated
+    //     with it. Create a new region.
+    // 3.) For all adjacent triangles, if it is the same color, add it to
+    //     the curent region. If it is different, ignore. But, if that
+    //     ignored triangle has a region associated with it, update both
+    //     region's adjacency lists.
+    // 4.) Go back to #2 until all triangles have a region.
+    let knownRegions = new List<Region>()
+    let triangleRegions : Region option[,] = Array2D.zeroCreate 10 29
+
+    let rec floodFillRegion col row (region : Region) =
+        match triangleRegions.[col, row] with
+        // If the triangle's neighbor is a well-known region, then we stop
+        // recursing. (Even if that region is the current region being filled.)
+        | Some(adjacentRegion) ->
+            region.AddAdjacentRegion(adjacentRegion)
+        // If the adjacent triangle does not have a region, then we merge it
+        // into the region being flooed filled if it has the same color, otherwise
+        // we ignore it. (And will "get to it" later.)
+        | None ->
+            let triangleColor = rawData.Triangles.[col, row]
+            if triangleColor = region.Color then
+                triangleRegions.[col, row] <- Some(region)
+
+                // Mark it on the debug image.
+                let x, y = getTrianglePoint col row
+                let regionColor = solidColors.[region.ID % solidColors.Length]
+                debugImage.AddCircleOutline(x, y, regionColor)
+
+                // Recurse
+                getAdjacentTriangles col row
+                |> Seq.iter (fun (col', row') -> floodFillRegion col' row' region)
+            else
+                // Ignore the diff colored neighbor, as it will be a part
+                // of a different region constructed later.
+                ()
+
+    for col = 0 to 9 do
+        for row = 0 to 28 do
+            match triangleRegions.[col, row] with
+            | Some(_) -> ()
+            | None ->
+                let newRegion = {
+                    ID = knownRegions.Count
+                    Color = rawData.Triangles.[col, row]
+                    AdjacentRegions = new HashSet<int>()
+                }
+                floodFillRegion col row newRegion
+                knownRegions.Add(newRegion)
+
     debugImage.Save("demo.png")
-    puzzleInfo
+
+    {
+        NumColors = rawData.NumColors
+        Regions = knownRegions
+    }

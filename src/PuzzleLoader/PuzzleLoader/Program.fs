@@ -19,14 +19,13 @@ let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^
 let main argv =
 
     let filePath = "./test/puzzle.jpg"
-    let rawPuzzle = AnalyzePuzzleImage filePath
+    let puzzle = ExtractPuzzle filePath
 
-    printfn "Puzzle '%s'" filePath
-    printfn "Using %d colors" rawPuzzle.NumColors
-    for row = 0 to 28 do
-        printf "\t> "
-        for col = 0 to 9 do
-            printf "%d\t" rawPuzzle.Triangles.[col, row]
+    printfn "Puzzle has %d colors and %d regions" puzzle.NumColors puzzle.Regions.Count
+    for region in puzzle.Regions do
+        printf "Region %d [%d] -> " region.ID region.Color
+        for adjRegion in region.AdjacentRegions do
+            printf "%d " adjRegion
         printfn ""
 
     printfn "Done"
