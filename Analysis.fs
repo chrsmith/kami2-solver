@@ -187,10 +187,15 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
             surface.Dispose()
 
 
+type Color = { Red: byte; Green: byte; Blue: byte }
+
 // Raw puzzle extracted from a screenshot.
 type RawKami2Puzzle = {
     // Number of colors used in the puzzle.
     NumColors: int
+    // RGB of the colors used.
+    PuzzleColors: Color[]
+
     // Index of the color of each individual triagle. See other comments for
     // translating coordinates to triangles, and adjacency rules.
     // Has value of -1 if the triangle doesn't match any puzzle colors.
@@ -202,6 +207,10 @@ type RawKami2Puzzle = {
 type Region = {
     ID: int
     Color: int
+    // Hex value of the RGB value of the color index.
+    ColorCode: string
+    // Number of triangles in the region.
+    mutable Size: int
     // IDs of adjacent regions
     AdjacentRegions: HashSet<int>
 } with
@@ -274,6 +283,8 @@ let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
 
     {
         NumColors = puzzleColors.Length
+        PuzzleColors = puzzleColors
+                       |> Array.map (fun c -> {Red = c.Red; Green = c.Green; Blue = c.Blue})
         Triangles = Array2D.init 10 29 getTriangleColor
     }
 
@@ -311,6 +322,7 @@ let ExtractPuzzle imageFilePath =
             let triangleColor = rawData.Triangles.[col, row]
             if triangleColor = region.Color then
                 triangleRegions.[col, row] <- Some(region)
+                region.Size <- region.Size + 1
 
                 // Mark it on the debug image.
                 let x, y = getTrianglePoint col row
@@ -328,16 +340,19 @@ let ExtractPuzzle imageFilePath =
     // Check each triangle and ensure it is apart of a region.
     for col = 0 to 9 do
         for row = 0 to 28 do
-            let triangleColor = rawData.Triangles.[col, row]
+            let triangleColorIdx = rawData.Triangles.[col, row]
             match triangleRegions.[col, row] with
             // Ignore triangles already associated with a region or
             // not part of the puzzle.
             | Some(_) -> ()
-            | _ when triangleColor = -1 -> ()
+            | _ when triangleColorIdx = -1 -> ()
             | None ->
+                let triangleColor = rawData.PuzzleColors.[triangleColorIdx]
                 let newRegion = {
                     ID = knownRegions.Count
-                    Color = triangleColor
+                    Color = triangleColorIdx
+                    ColorCode = sprintf "#%x%x%x" triangleColor.Red triangleColor.Green triangleColor.Blue
+                    Size = 0  // Updated in flood fill.
                     AdjacentRegions = new HashSet<int>()
                 }
                 knownRegions.Add(newRegion)

@@ -3,6 +3,7 @@
 open System.IO
 
 open PuzzleLoader.Analysis
+open PuzzleLoader.Solver
 
 
 [<EntryPoint>]
@@ -16,7 +17,7 @@ let main argv =
 
             printfn "Puzzle has %d colors and %d regions" puzzle.NumColors puzzle.Regions.Count
             for region in puzzle.Regions do
-                printf "Region %d [%d] -> " region.ID region.Color
+                printf "Region %d [%d, #%s] [%d triangles]-> " region.ID region.Color region.ColorCode region.Size
                 for adjRegion in region.AdjacentRegions do
                     printf "%d " adjRegion
                 printfn ""
