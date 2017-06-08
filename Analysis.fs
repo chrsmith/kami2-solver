@@ -215,8 +215,9 @@ type Region = {
     AdjacentRegions: HashSet<int>
 } with
     member this.AddAdjacentRegion(adjacentRegion : Region) =
-        this.AdjacentRegions.Add(adjacentRegion.ID) |> ignore
-        adjacentRegion.AdjacentRegions.Add(this.ID) |> ignore
+        if adjacentRegion.ID <> this.ID then
+            this.AdjacentRegions.Add(adjacentRegion.ID) |> ignore
+            adjacentRegion.AdjacentRegions.Add(this.ID) |> ignore
 
 
 type Kami2Puzzle = {
