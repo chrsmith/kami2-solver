@@ -100,7 +100,7 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
 // dot -T test.dot -o test.png
 
 // Emit the dot file representation for a puzzle's regions/nodes.
-let emitRegionLabels (regions : seq<ImmutableRegion>) =
+let emitRegionLabels (regions : seq<Region>) =
     regions
     |> Seq.map (fun region ->
         sprintf "    r_%d [style=\"filled\", fillcolor=\"%s\"]"
@@ -108,14 +108,14 @@ let emitRegionLabels (regions : seq<ImmutableRegion>) =
                 region.ColorCode)
 
 // Emit the dot file representation for a region's associations.
-let emitRegionAssociations (region : ImmutableRegion) =
+let emitRegionAssociations (region : Region) =
     region.AdjacentRegions
     |> Seq.map (sprintf "r_%d")
     |> Seq.map (sprintf "r_%d -- %s" region.ID)
 
 
 // Convert a Kami2 puzzle into a string dot file, to be rendered.
-let ConvertToGraph (regions : seq<ImmutableRegion>) =
+let ConvertToGraph (regions : seq<Region>) =
     seq {
         yield "strict graph kami_puzzle {"
         // Emit the nodes. Give each a number (since puzzles with more than
@@ -132,7 +132,7 @@ let ConvertToGraph (regions : seq<ImmutableRegion>) =
     }
 
 // Renders the regions as a PNG file.
-let RenderAsGraph (regions : seq<ImmutableRegion>) outputFilePath =
+let RenderAsGraph (regions : seq<Region>) outputFilePath =
     let dotFilePath = Path.GetTempFileName()
     let dotFileLines = ConvertToGraph regions
     File.WriteAllLines(dotFilePath, dotFileLines)

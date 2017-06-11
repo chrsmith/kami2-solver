@@ -1,4 +1,4 @@
-﻿module Kami2Solver.Program
+module Kami2Solver.Program
 
 open System.Diagnostics
 open System.IO
@@ -11,15 +11,17 @@ open Kami2Solver.Solver
 
 [<EntryPoint>]
 let main argv =
+    printfn "Kami2 Puzzle Solver"
 
-    let puzzleImages = Directory.GetFiles("./puzzles/")
-    for imageFilePath in puzzleImages do
-        // Sample puzzle images are jpegs, everything else is a png.
-        if imageFilePath.Contains(".jpg") && imageFilePath.Contains("IMG_1743") then 
-            printfn "Extracing data from image %s..." imageFilePath
-            let puzzle = ExtractPuzzle imageFilePath
+    let puzzleImages = Directory.GetFiles("./puzzles/", "*.jpg")
+    for puzzleImagePath in puzzleImages do
+        if puzzleImagePath.Contains("1743") then
+            printfn "Solving puzzle [%s]" (Path.GetFileName(puzzleImagePath))
 
-            printfn "Puzzle has %d colors and %d regions" puzzle.NumColors puzzle.Regions.Count
+            printfn "Analyzing..."
+            let puzzle = Analysis.ExtractPuzzle puzzleImagePath
+
+            printfn "Puzzle has %d colors and %d regions" puzzle.Colors.Length (Seq.length puzzle.Regions)
             (*
             for region in puzzle.Regions do
                 printf "Region %d [%d, #%s] [%d triangles]-> " region.ID region.Color region.ColorCode region.Size
@@ -29,11 +31,11 @@ let main argv =
             *)
 
             // Print the dot file graph version.
-            let sourceImageDir = Path.GetDirectoryName(imageFilePath)
-            let sourceImageName = Path.GetFileNameWithoutExtension(imageFilePath)
+            let sourceImageDir = Path.GetDirectoryName(puzzleImagePath)
+            let sourceImageName = Path.GetFileNameWithoutExtension(puzzleImagePath)
             let graphImagePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.png")
             Export.RenderAsGraph
-                (puzzle.Regions |> Seq.map (fun r -> r.Convert()))
+                puzzle.Regions
                 graphImagePath
 
             // Solve it.

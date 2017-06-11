@@ -205,6 +205,34 @@ let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
     }
 
 
+// Mutable variant of the Region type, which is exported publicly.
+type RegionBuilder = {
+    ID: int
+    Color: int
+    Position: int * int
+    // Hex value of the RGB value of the color index.
+    ColorCode: string
+    // Number of triangles in the region.
+    mutable Size: int
+    // IDs of adjacent regions
+    AdjacentRegions: HashSet<int>
+} with
+    member this.AddAdjacentRegion(adjacentRegion : RegionBuilder) =
+        if adjacentRegion.ID <> this.ID then
+            this.AdjacentRegions.Add(adjacentRegion.ID) |> ignore
+            adjacentRegion.AdjacentRegions.Add(this.ID) |> ignore
+
+    static member ConvertRegion(rb : RegionBuilder) =
+        {
+            Region.ID = rb.ID
+            Color = rb.Color
+            Position = rb.Position
+            ColorCode = rb.ColorCode
+            Size = rb.Size
+            AdjacentRegions = Set.ofSeq rb.AdjacentRegions
+        }
+        
+
 // Extract a Kami2Puzzle object from an in-game screenshot.
 let ExtractPuzzle imageFilePath =
     use bitmap = loadKamiPuzzleImage imageFilePath
@@ -223,10 +251,10 @@ let ExtractPuzzle imageFilePath =
     //     ignored triangle has a region associated with it, update both
     //     region's adjacency lists.
     // 4.) Go back to #2 until all triangles have a region.
-    let knownRegions = new List<Region>()
-    let triangleRegions : Region option[,] = Array2D.zeroCreate 10 29
+    let knownRegions = new List<RegionBuilder>()
+    let triangleRegions : RegionBuilder option[,] = Array2D.zeroCreate 10 29
 
-    let rec floodFillRegion col row (region : Region) =
+    let rec floodFillRegion col row (region : RegionBuilder) =
         match triangleRegions.[col, row] with
         // If the triangle's neighbor is already known, mark as neighbor and stop.
         | Some(adjacentRegion) ->
@@ -265,12 +293,12 @@ let ExtractPuzzle imageFilePath =
             | None ->
                 let triangleColor = rawData.PuzzleColors.[triangleColorIdx]
                 let newRegion = {
-                    ID = knownRegions.Count
-                    Color = triangleColorIdx
-                    Position = (col, row)
-                    ColorCode = sprintf "#%x%x%x" triangleColor.Red triangleColor.Green triangleColor.Blue
-                    Size = 0  // Updated in flood fill.
-                    AdjacentRegions = new HashSet<int>()
+                    RegionBuilder.ID = knownRegions.Count
+                    RegionBuilder.Color = triangleColorIdx
+                    RegionBuilder.Position = (col, row)
+                    RegionBuilder.ColorCode = sprintf "#%x%x%x" triangleColor.Red triangleColor.Green triangleColor.Blue
+                    RegionBuilder.Size = 0  // Updated in flood fill.
+                    RegionBuilder.AdjacentRegions = new HashSet<int>()
                 }
                 knownRegions.Add(newRegion)
                 floodFillRegion col row newRegion
@@ -291,6 +319,6 @@ let ExtractPuzzle imageFilePath =
     debugImage.Save(Path.Combine(sourceImageDir, sourceImageName + ".analyzed.png"))
 
     {
-        NumColors = rawData.NumColors
-        Regions = knownRegions
+        Colors = rawData.PuzzleColors
+        Regions = knownRegions |> Seq.map RegionBuilder.ConvertRegion
     }

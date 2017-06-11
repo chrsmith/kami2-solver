@@ -138,13 +138,10 @@ let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth max
             None
         
 
+// Returns the list of (regionID, colorID) moves to make if a solution is found.
 let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth =
-    let convertedRegions =
-        kami2Puzzle.Regions
-        |> Seq.map (fun region -> region.Convert())
-
     let startingPuzzle : Kami2PuzzleStep = {
-        Regions = convertedRegions
+        Regions = kami2Puzzle.Regions
                   |> Seq.map (fun region -> region.ID, region)
                   |> Map.ofSeq
     }
@@ -152,5 +149,4 @@ let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth =
     bruteForceSteps <- 0
     let result = bruteForceStep startingPuzzle [] 0 maxDepth
     printfn "brugeForceStepset = %d, Results = %A" bruteForceSteps result
-
-    // Render each move as a graph for debugging purposes.
+    result |> Option.map (fun moves -> List.rev moves)
