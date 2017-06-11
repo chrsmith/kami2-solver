@@ -1,0 +1,17 @@
+
+Microsoft Visual Studio Solution File, Format Version 15.00
+# Visual Studio 2017
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Kami2Solver", "Kami2Solver.fsproj", "{A6126AEC-4FD4-4569-BC5D-84F92178523E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A6126AEC-4FD4-4569-BC5D-84F92178523E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6126AEC-4FD4-4569-BC5D-84F92178523E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6126AEC-4FD4-4569-BC5D-84F92178523E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6126AEC-4FD4-4569-BC5D-84F92178523E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

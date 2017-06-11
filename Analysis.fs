@@ -207,6 +207,8 @@ type RawKami2Puzzle = {
 type Region = {
     ID: int
     Color: int
+    // col, row position of a triangle in the region.
+    Position: int * int
     // Hex value of the RGB value of the color index.
     ColorCode: string
     // Number of triangles in the region.
@@ -352,6 +354,7 @@ let ExtractPuzzle imageFilePath =
                 let newRegion = {
                     ID = knownRegions.Count
                     Color = triangleColorIdx
+                    Position = (col, row)
                     ColorCode = sprintf "#%x%x%x" triangleColor.Red triangleColor.Green triangleColor.Blue
                     Size = 0  // Updated in flood fill.
                     AdjacentRegions = new HashSet<int>()
