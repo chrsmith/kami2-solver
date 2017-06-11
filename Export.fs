@@ -1,6 +1,7 @@
 ﻿module PuzzleLoader.Export
 
 open System
+open System.Diagnostics
 open System.IO
 
 open SkiaSharp
@@ -129,3 +130,15 @@ let ConvertToGraph (regions : seq<ImmutableRegion>) =
             
         yield "}"
     }
+
+// Renders the regions as a PNG file.
+let RenderAsGraph (regions : seq<ImmutableRegion>) outputFilePath =
+    let dotFilePath = Path.GetTempFileName()
+    let dotFileLines = ConvertToGraph regions
+    File.WriteAllLines(dotFilePath, dotFileLines)
+
+    // Render, assuming `dot` is on the current path.
+    let args = sprintf "-Tpng %s -o %s"
+                        dotFilePath
+                        outputFilePath
+    Process.Start("dot", args) |> ignore

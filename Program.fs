@@ -31,20 +31,15 @@ let main argv =
             // Print the dot file graph version.
             let sourceImageDir = Path.GetDirectoryName(imageFilePath)
             let sourceImageName = Path.GetFileNameWithoutExtension(imageFilePath)
-            let dotFilePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.dot")
-            let dotFileLines = Export.ConvertToGraph(puzzle.Regions |> Seq.map (fun region -> region.Convert()))
-            File.WriteAllLines(dotFilePath, dotFileLines)
-
-            // Render the graphs. Obviously assumes `dot` is on the current path.
-            let dotFileImagePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.png")
-            let args = sprintf "-Tpng %s -o %s"
-                                dotFilePath
-                                dotFileImagePath
-            Process.Start("dot", args) |> ignore
+            let graphImagePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.png")
+            Export.RenderAsGraph
+                (puzzle.Regions |> Seq.map (fun r -> r.Convert()))
+                graphImagePath
 
             // Solve it.
             printfn "Solving..."
-            Solver.BruteForce puzzle 4
+            let solution = Solver.BruteForce puzzle 4
+            printfn "Solution = %A" solution
 
         printfn "Done"
 

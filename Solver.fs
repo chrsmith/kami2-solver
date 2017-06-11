@@ -152,3 +152,5 @@ let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth =
     bruteForceSteps <- 0
     let result = bruteForceStep startingPuzzle [] 0 maxDepth
     printfn "brugeForceStepset = %d, Results = %A" bruteForceSteps result
+
+    // Render each move as a graph for debugging purposes.
