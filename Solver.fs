@@ -215,35 +215,35 @@ let enumerateAllMoves (puzzleStep : Kami2PuzzleStep) =
 
 let mutable bruteForceSteps = 0
 let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth maxDepth =
-    printfn ">> bruteForceStep %A %d/%d" movesList currentDepth maxDepth
+    // printfn ">> bruteForceStep %A %d/%d" movesList currentDepth maxDepth
 
     bruteForceSteps <- bruteForceSteps + 1
     if puzzleStep.IsSolved then
-        printfn "\tSolution Found!"
+        // printfn "\tSolution Found!"
         Some(movesList)
     elif currentDepth >= maxDepth then
-        printfn "\tMax depth hit"
+        // printfn "\tMax depth hit"
         None
     else
         let foundSolution =
             enumerateAllMoves puzzleStep
             |> Seq.map (fun (regionToColor, newColor) ->
-                printfn "Coloring region %d color %d" regionToColor newColor
-                printfn "-----\nBEFORE\n-----"
-                puzzleStep.DebugPrint()
+                // printfn "Coloring region %d color %d" regionToColor newColor
+                // printfn "-----\nBEFORE\n-----"
+                // puzzleStep.DebugPrint()
 
                 let updatedPuzzle = colorRegion puzzleStep regionToColor newColor
-                printfn "-----\nAFTER\n-----"
-                updatedPuzzle.DebugPrint()
+                // printfn "-----\nAFTER\n-----"
+                // updatedPuzzle.DebugPrint()
 
                 bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (currentDepth + 1) maxDepth)
             |> Seq.tryFind (fun results -> Option.isSome results)
         match foundSolution with
         | Some(sln) ->
-            printfn "\tReturning solution"
+            // printfn "\tReturning solution"
             sln
         | None -> 
-            printfn "\tDone recursing"
+            // printfn "\tDone recursing"
             None
         
 

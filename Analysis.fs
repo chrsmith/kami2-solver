@@ -173,6 +173,19 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
             x, y, kAnnotationSize,
             paint)
 
+    member this.AddText(text : string, x : float32, y : float32, color) =
+        // Shift a little bit so it doesn't overlap.
+        let x = x - 32.0f
+        let y = y + 16.0f;
+
+        paint.Color <- color
+        paint.IsStroke <- false
+        canvas.DrawText(text, x, y, paint)
+
+        paint.Color <- kWhite
+        paint.IsStroke <- true
+        canvas.DrawText(text, x, y, paint)
+
     // Save the image to disk in the PNG format.
     member this.Save(filePath) =
         let finalImage = surface.Snapshot()
@@ -362,6 +375,15 @@ let ExtractPuzzle imageFilePath =
                 knownRegions.Add(newRegion)
                 floodFillRegion col row newRegion
 
+    // Label region IDs and color indices last, as to not get overwritten.
+    knownRegions
+    |> Seq.iter (fun region ->
+        let (x,y) = getTrianglePoint (fst region.Position) (snd region.Position)
+        debugImage.AddText(region.ID.ToString(), x, y, kMagenta))
+
+    for i = 0 to rawData.NumColors - 1 do
+        let (x, y) = getPuzzleColorPoint i rawData.NumColors
+        debugImage.AddText(i.ToString(), x, y, kMagenta)
 
     // Save our marked up puzzle.
     let sourceImageDir = Path.GetDirectoryName(imageFilePath)
