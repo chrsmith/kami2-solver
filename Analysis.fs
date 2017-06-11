@@ -6,6 +6,9 @@ open System.Collections.Generic
 
 open SkiaSharp
 
+open PuzzleLoader.Types
+open PuzzleLoader.Export
+
 
 let kBlack = new SKColor(0uy, 0uy, 0uy, 255uy)
 let kMagenta = new SKColor(200uy, 0uy, 200uy, 255uy)
@@ -40,9 +43,6 @@ let kColorPaletXOffset = kGridWidth - kColorPaletWidth
 // Width/height of the triangle grid.
 let kColWidth = kGridWidth / 10.0f
 let kRowHeight = kGridHeight / 28.0f
-
-// Size of annotations in the debug image.
-let kAnnotationSize = 22.0f
 
 // Similiarty between two colors to be considered a match.
 // BUG? This seems unreasonablly high, but is necessary in practice.
@@ -139,106 +139,6 @@ let loadKamiPuzzleImage filePath =
     use fileStream = File.OpenRead(filePath)
     use skiaStream = new SKManagedStream(fileStream)
     SKBitmap.Decode(skiaStream)
-
-
-// Kami2 puzzle image with annotations to aid in debugging.
-type AnalysisDebugImage(originalImage : SKBitmap) =
-    let surface = SKSurface.Create(originalImage.Width,
-                                   originalImage.Height,
-                                   SKImageInfo.PlatformColorType,
-                                   SKAlphaType.Premul)
-    let canvas = surface.Canvas
-    let paint = new SKPaint(TextSize = 80.0f,
-                            IsAntialias = true,
-                            Color = kBlack,
-                            StrokeWidth = 5.0f)
-
-    do canvas.DrawBitmap(originalImage, 0.0f, 0.0f, paint)
-
-    member this.DrawLine(x0, y0, x1, y1, color) =
-        paint.Color <- color
-        canvas.DrawLine(x0, y0, x1, y1, paint)
-
-    member this.AddCircle(x, y, color) =
-        paint.IsStroke <- false
-        paint.Color <- color
-        canvas.DrawCircle(
-            x, y, kAnnotationSize,
-            paint)
-
-    member this.AddCircleOutline(x, y, color) =
-        paint.IsStroke <- true
-        paint.Color <- color
-        canvas.DrawCircle(
-            x, y, kAnnotationSize,
-            paint)
-
-    member this.AddText(text : string, x : float32, y : float32, color) =
-        // Shift a little bit so it doesn't overlap.
-        let x = x - 32.0f
-        let y = y + 16.0f;
-
-        paint.Color <- color
-        paint.IsStroke <- false
-        canvas.DrawText(text, x, y, paint)
-
-        paint.Color <- kWhite
-        paint.IsStroke <- true
-        canvas.DrawText(text, x, y, paint)
-
-    // Save the image to disk in the PNG format.
-    member this.Save(filePath) =
-        let finalImage = surface.Snapshot()
-        use pngEncodedFile = finalImage.Encode();
-        File.WriteAllBytes(filePath, pngEncodedFile.ToArray())
-
-    // Clean up Skia objects.
-    interface IDisposable with
-        member __.Dispose() =
-            paint.Dispose()
-            canvas.Dispose()
-            surface.Dispose()
-
-
-type Color = { Red: byte; Green: byte; Blue: byte }
-
-// Raw puzzle extracted from a screenshot.
-type RawKami2Puzzle = {
-    // Number of colors used in the puzzle.
-    NumColors: int
-    // RGB of the colors used.
-    PuzzleColors: Color[]
-
-    // Index of the color of each individual triagle. See other comments for
-    // translating coordinates to triangles, and adjacency rules.
-    // Has value of -1 if the triangle doesn't match any puzzle colors.
-    Triangles: int[,]
-}
-
-
-// Kami2 puzzle represented as a graph.
-type Region = {
-    ID: int
-    Color: int
-    // col, row position of a triangle in the region.
-    Position: int * int
-    // Hex value of the RGB value of the color index.
-    ColorCode: string
-    // Number of triangles in the region.
-    mutable Size: int
-    // IDs of adjacent regions
-    AdjacentRegions: HashSet<int>
-} with
-    member this.AddAdjacentRegion(adjacentRegion : Region) =
-        if adjacentRegion.ID <> this.ID then
-            this.AdjacentRegions.Add(adjacentRegion.ID) |> ignore
-            adjacentRegion.AdjacentRegions.Add(this.ID) |> ignore
-
-
-type Kami2Puzzle = {
-    NumColors: int
-    Regions: List<Region>
-}
 
 
 // Analyze a screen shot of a Kami2 puzzle and convert it into a RawKami2Puzzle

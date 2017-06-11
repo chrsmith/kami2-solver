@@ -3,7 +3,9 @@
 open System.Diagnostics
 open System.IO
 
+open PuzzleLoader.Types
 open PuzzleLoader.Analysis
+open PuzzleLoader.Export
 open PuzzleLoader.Solver
 
 
@@ -30,7 +32,7 @@ let main argv =
             let sourceImageDir = Path.GetDirectoryName(imageFilePath)
             let sourceImageName = Path.GetFileNameWithoutExtension(imageFilePath)
             let dotFilePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.dot")
-            let dotFileLines = Solver.ConvertToGraph puzzle
+            let dotFileLines = Export.ConvertToGraph(puzzle.Regions |> Seq.map (fun region -> region.Convert()))
             File.WriteAllLines(dotFilePath, dotFileLines)
 
             // Render the graphs. Obviously assumes `dot` is on the current path.
