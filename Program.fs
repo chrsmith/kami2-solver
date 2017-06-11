@@ -1,12 +1,12 @@
-﻿module PuzzleLoader.Program
+﻿module Kami2Solver.Program
 
 open System.Diagnostics
 open System.IO
 
-open PuzzleLoader.Types
-open PuzzleLoader.Analysis
-open PuzzleLoader.Export
-open PuzzleLoader.Solver
+open Kami2Solver.Types
+open Kami2Solver.Analysis
+open Kami2Solver.Export
+open Kami2Solver.Solver
 
 
 [<EntryPoint>]

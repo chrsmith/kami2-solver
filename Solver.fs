@@ -1,8 +1,8 @@
-﻿module PuzzleLoader.Solver
+﻿module Kami2Solver.Solver
 
 open System.Collections.Generic
 
-open PuzzleLoader.Types
+open Kami2Solver.Types
 
 
 // Color a region in the given puzzle, returning the new puzzle state.

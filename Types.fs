@@ -1,4 +1,4 @@
-﻿namespace PuzzleLoader.Types
+﻿namespace Kami2Solver.Types
 
 open System.Collections.Generic
 

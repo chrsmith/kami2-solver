@@ -1,4 +1,4 @@
-﻿module PuzzleLoader.Export
+﻿module Kami2Solver.Export
 
 open System
 open System.Diagnostics
@@ -6,7 +6,7 @@ open System.IO
 
 open SkiaSharp
 
-open PuzzleLoader.Types
+open Kami2Solver.Types
 
 
 // Size of annotations in the debug image.

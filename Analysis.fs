@@ -1,4 +1,4 @@
-﻿module PuzzleLoader.Analysis
+﻿module Kami2Solver.Analysis
 
 open System
 open System.IO
@@ -6,8 +6,8 @@ open System.Collections.Generic
 
 open SkiaSharp
 
-open PuzzleLoader.Types
-open PuzzleLoader.Export
+open Kami2Solver.Types
+open Kami2Solver.Export
 
 
 let kBlack = new SKColor(0uy, 0uy, 0uy, 255uy)
