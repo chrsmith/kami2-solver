@@ -104,6 +104,25 @@ let enumerateAllMoves (puzzleStep : Kami2PuzzleStep) =
         |> Seq.concat
     possibleMoves
 
+
+// Heuristic to evaluate a potential move. A value of <= 0 means the resulting
+// puzzle is not solveable, ando therefore should not be considered. The higher
+// the value the more promising the move is.
+let evaluateMove (puzzle : Kami2PuzzleStep) (regionId, color) movesLeft =
+    let regionBeingColored = puzzle.Regions.[regionId]
+    let (neighborsColored, totalTrianglesColored) =
+        regionBeingColored.AdjacentRegions
+        |> Set.toSeq
+        |> Seq.map (fun regionId -> puzzle.Regions.[regionId])
+        |> Seq.fold (fun (neighborsColored, totalTrianglesColored) neighbor ->
+            if neighbor.Color = color then
+                (neighborsColored + 1, totalTrianglesColored + neighbor.Size)
+            else
+                (neighborsColored, totalTrianglesColored)) (0, 0)
+
+    10 * neighborsColored + totalTrianglesColored
+
+
 let mutable bruteForceSteps = 0
 let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth maxDepth =
     // printfn ">> bruteForceStep %A %d/%d" movesList currentDepth maxDepth
@@ -119,6 +138,11 @@ let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth max
         let foundSolution =
             enumerateAllMoves puzzleStep
             |> Seq.map (fun (regionToColor, newColor) ->
+                let evaluation = evaluateMove puzzleStep (regionToColor, newColor) (maxDepth - currentDepth)
+                (regionToColor, newColor, evaluation))
+            |> Seq.filter (fun (_,_,eval) -> eval > 0)
+            |> Seq.sortByDescending (fun (_,_,eval) -> eval)
+            |> Seq.map (fun (regionToColor, newColor, _) ->
                 // printfn "Coloring region %d color %d" regionToColor newColor
                 // printfn "-----\nBEFORE\n-----"
                 // puzzleStep.DebugPrint()

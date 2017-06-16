@@ -15,7 +15,7 @@ let main argv =
 
     let puzzleImages = Directory.GetFiles("./puzzles/", "*.jpg")
     for puzzleImagePath in puzzleImages do
-        if puzzleImagePath.Contains("1743") then
+        if puzzleImagePath.Contains("1733") then
             printfn "Solving puzzle [%s]" (Path.GetFileName(puzzleImagePath))
 
             printfn "Analyzing..."
@@ -40,7 +40,7 @@ let main argv =
 
             // Solve it.
             printfn "Solving..."
-            let solution = Solver.BruteForce puzzle 4
+            let solution = Solver.BruteForce puzzle 10
             printfn "Solution = %A" solution
 
         printfn "Done"
