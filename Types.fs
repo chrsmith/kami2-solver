@@ -68,3 +68,9 @@ type Kami2PuzzleStep = {
         |> Map.toSeq
         |> Seq.map (fun (_,region) -> sprintf "%O" region)
         |> String.concat "\n"
+
+type PuzzleSolution = {
+    NodesEvaluated: int
+    // None indicates no solution was found. Otherwise region x color pairs.
+    Moves: (int * int) list option
+}

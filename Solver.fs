@@ -1,6 +1,8 @@
 ﻿module Kami2Solver.Solver
 
 open System.Collections.Generic
+open System.Threading
+open System.Threading.Tasks
 
 open Kami2Solver.Types
 
@@ -124,11 +126,13 @@ let evaluateMove (puzzle : Kami2PuzzleStep) (regionId, color) movesLeft =
 
 
 let mutable bruteForceSteps = 0
-let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth maxDepth =
+let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth maxDepth (token : CancellationToken) =
     // printfn ">> bruteForceStep %A %d/%d" movesList currentDepth maxDepth
 
     bruteForceSteps <- bruteForceSteps + 1
-    if puzzleStep.IsSolved then
+    if token.IsCancellationRequested then
+        None
+    elif puzzleStep.IsSolved then
         // printfn "\tSolution Found!"
         Some(movesList)
     elif currentDepth >= maxDepth then
@@ -151,7 +155,7 @@ let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth max
                 // printfn "-----\nAFTER\n-----"
                 // updatedPuzzle.DebugPrint()
 
-                bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (currentDepth + 1) maxDepth)
+                bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (currentDepth + 1) maxDepth token)
             |> Seq.tryFind (fun results -> Option.isSome results)
         match foundSolution with
         | Some(sln) ->
@@ -163,7 +167,7 @@ let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth max
         
 
 // Returns the list of (regionID, colorID) moves to make if a solution is found.
-let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth =
+let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth (token : CancellationToken) =
     let startingPuzzle : Kami2PuzzleStep = {
         Regions = kami2Puzzle.Regions
                   |> Seq.map (fun region -> region.ID, region)
@@ -171,6 +175,8 @@ let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth =
     }
 
     bruteForceSteps <- 0
-    let result = bruteForceStep startingPuzzle [] 0 maxDepth
-    printfn "brugeForceStepset = %d, Results = %A" bruteForceSteps result
-    result |> Option.map (fun moves -> List.rev moves)
+    let result = bruteForceStep startingPuzzle [] 0 maxDepth token
+    {
+        NodesEvaluated = bruteForceSteps
+        Moves = result |> Option.map (fun moves -> List.rev moves)
+    }
