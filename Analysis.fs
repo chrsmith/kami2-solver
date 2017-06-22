@@ -234,7 +234,7 @@ type RegionBuilder = {
         
 
 // Extract a Kami2Puzzle object from an in-game screenshot.
-let ExtractPuzzle imageFilePath =
+let ExtractPuzzle imageFilePath saveDebugImage =
     use bitmap = loadKamiPuzzleImage imageFilePath
     use debugImage = new AnalysisDebugImage(bitmap)
 
@@ -313,10 +313,10 @@ let ExtractPuzzle imageFilePath =
         let (x, y) = getPuzzleColorPoint i rawData.NumColors
         debugImage.AddText(i.ToString(), x, y, kMagenta)
 
-    // Save our marked up puzzle.
-    let sourceImageDir = Path.GetDirectoryName(imageFilePath)
-    let sourceImageName = Path.GetFileNameWithoutExtension(imageFilePath)
-    debugImage.Save(Path.Combine(sourceImageDir, sourceImageName + ".analyzed.png"))
+    if saveDebugImage then
+        let sourceImageDir = Path.GetDirectoryName(imageFilePath)
+        let sourceImageName = Path.GetFileNameWithoutExtension(imageFilePath)
+        debugImage.Save(Path.Combine(sourceImageDir, sourceImageName + ".analyzed.png"))
 
     {
         Colors = rawData.PuzzleColors

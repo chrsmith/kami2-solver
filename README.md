@@ -13,8 +13,8 @@ Details on the algorithm and approach can be found on my blog at:
 
 :construction: **Not Yet Finished** :construction:
 
-Only Part 1, loading puzzels from screen shots, is in the repo right now.
-Actually solving puzzles is comming soon.
+- [Part 1](http://completely-unique.com/posts/kami2-solver-part-1)
+- [Part 2](http://completely-unique.com/posts/kami2-solver-part-2)
 
 ## Known Issues
 
