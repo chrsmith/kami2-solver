@@ -9,7 +9,8 @@ open Kami2Solver.Types
 
 // Color a region in the given puzzle, returning the new puzzle state.
 // This is done by essentially "deleting" any existing adjacent regions
-// that hve the newColor as a color. And merge them into regionId
+// that have the newColor as a color. And merge them into regionId.
+// Returns a new Kami2PuzzleStep.
 let colorRegion puzzle regionId newColor =
     let regionToColor = Map.find regionId puzzle.Regions
 
@@ -88,7 +89,8 @@ let colorRegion puzzle regionId newColor =
             |> Map.ofSeq
     }
 
-// Brute force kami2 puzzle solving to a max depth.
+// Enumerates all valid moves from a given puzzle step.
+// seq<PuzzleStep>
 let enumerateAllMoves (puzzleStep : Kami2PuzzleStep) =
     let colorsUsed = new HashSet<int>()
     do puzzleStep.Regions

@@ -59,7 +59,7 @@ let main argv =
             let stopwatch = Stopwatch.StartNew()
 
             let cts = new CancellationTokenSource()
-            let solution = lazy (Solver.BruteForce puzzle 10 cts.Token)
+            let solution = lazy (Solver.BruteForce puzzle 30 cts.Token)
 
             let solverTask = Task.Run((fun () -> solution.Force()), cts.Token)
             if not <| solverTask.Wait(TimeSpan.FromSeconds(10.0)) then
