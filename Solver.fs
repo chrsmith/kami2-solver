@@ -128,19 +128,18 @@ let evaluateMove (puzzle : Kami2PuzzleStep) (regionId, color) movesLeft =
 
 
 let mutable bruteForceSteps = 0
+let mutable duplicateSteps = 0
+let mutable knownSteps = new HashSet<int>()
 let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth maxDepth (token : CancellationToken) =
-    // printfn ">> bruteForceStep %A %d/%d" movesList currentDepth maxDepth
-
     bruteForceSteps <- bruteForceSteps + 1
-    if token.IsCancellationRequested then
-        None
-    elif puzzleStep.IsSolved then
-        // printfn "\tSolution Found!"
-        Some(movesList)
-    elif currentDepth >= maxDepth then
-        // printfn "\tMax depth hit"
-        None
+    let stepHashCode = puzzleStep.GetHashCode()
+
+    if token.IsCancellationRequested then None
+    elif knownSteps.Contains(stepHashCode) then duplicateSteps <- duplicateSteps + 1; None
+    elif puzzleStep.IsSolved then         Some(movesList)
+    elif currentDepth >= maxDepth then    None
     else
+        knownSteps.Add(stepHashCode) |> ignore
         let foundSolution =
             enumerateAllMoves puzzleStep
             |> Seq.map (fun (regionToColor, newColor) ->
@@ -149,23 +148,12 @@ let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth max
             |> Seq.filter (fun (_,_,eval) -> eval > 0)
             |> Seq.sortByDescending (fun (_,_,eval) -> eval)
             |> Seq.map (fun (regionToColor, newColor, _) ->
-                // printfn "Coloring region %d color %d" regionToColor newColor
-                // printfn "-----\nBEFORE\n-----"
-                // puzzleStep.DebugPrint()
-
                 let updatedPuzzle = colorRegion puzzleStep regionToColor newColor
-                // printfn "-----\nAFTER\n-----"
-                // updatedPuzzle.DebugPrint()
-
                 bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (currentDepth + 1) maxDepth token)
             |> Seq.tryFind (fun results -> Option.isSome results)
         match foundSolution with
-        | Some(sln) ->
-            // printfn "\tReturning solution"
-            sln
-        | None -> 
-            // printfn "\tDone recursing"
-            None
+        | Some(sln) -> sln
+        | None      -> None
         
 
 // Returns the list of (regionID, colorID) moves to make if a solution is found.
@@ -177,8 +165,11 @@ let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth (token : CancellationToken) 
     }
 
     bruteForceSteps <- 0
+    duplicateSteps <- 0
+    knownSteps <- new HashSet<int>()
     let result = bruteForceStep startingPuzzle [] 0 maxDepth token
     {
         NodesEvaluated = bruteForceSteps
+        DuplicateSteps = duplicateSteps
         Moves = result |> Option.map (fun moves -> List.rev moves)
     }

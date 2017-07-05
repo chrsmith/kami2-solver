@@ -70,7 +70,12 @@ type Kami2PuzzleStep = {
         |> String.concat "\n"
 
 type PuzzleSolution = {
+    // Number of nodes evaluated while looking for a solution. Only useful for
+    // evaluating algorithm effectiveness.
     NodesEvaluated: int
-    // None indicates no solution was found. Otherwise region x color pairs.
+    // Number of nodes culled for being duplicate.
+    DuplicateSteps: int
+    // None indicates no solution was found (timeout?). Otherwise it is a list
+    // of RegionID x ColorID pairs.
     Moves: (int * int) list option
 }

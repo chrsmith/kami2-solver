@@ -7,6 +7,7 @@
     <PackageReference Include="FSharp.Core" Version="4.1.*" />
     <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
     <PackageReference Include="SkiaSharp" Version="1.58.0" />
+    <PackageReference Include="Argu" Version="3.7.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Types.fs" />

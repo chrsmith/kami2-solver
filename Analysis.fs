@@ -107,6 +107,7 @@ let dotProduct colorA colorB =
 
 // Returns whether or not every color in the sequence is unique within a tolerance.
 let allUnique (colors : SKColor[]) =
+    if colors = null || colors.Length = 0 then failwith "???"
     let mutable allColorsUnique = true
     for i = 0 to colors.Length - 2 do
         for j = i + 1 to colors.Length - 1 do
