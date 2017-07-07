@@ -27,10 +27,11 @@ with
         member s.Usage =
             match s with
             | PuzzlesDirectory _ -> "directory containg puzzle images"
-            | PuzzleName _ -> "name of a puzzle to solve"
-            | PrintRegionInfo -> "print region information to STDOUT"
-            | SaveMarkupImage -> "save marked up puzzle image"
-            | SaveGraphImage -> "save graph output"
+            | PuzzleName _       -> "name of a puzzle to solve"
+            | PrintRegionInfo    -> "print region information to STDOUT"
+            | SaveMarkupImage    -> "save marked up puzzle image"
+            | SaveGraphImage     -> "save graph output"
+
 
 // Active pattern for matching if an input string contains a substring.
 let (|Contains|_|) (p:string) (s:string) =
@@ -39,8 +40,8 @@ let (|Contains|_|) (p:string) (s:string) =
 
 
 // Timeout in seconds to wait while trying to solve a puzzle.
-let kMinuteInSeconds = 60.0
-let kTimeoutSeconds = 2.0 * kMinuteInSeconds
+let kTimeoutSeconds = 60.0 * 30.0  // Half an hour :(
+
 
 [<EntryPoint>]
 let main argv =
@@ -65,8 +66,9 @@ let main argv =
 
             let puzzle = Analysis.ExtractPuzzle puzzleImagePath argSaveMarkupImage
             // TODO(chrsmith): The puzzle image has the number of steps (upper bound) required to solve.
-            // Hook up some OCR to do this. For now I will use a lame lookup.
-            let maxDepth = match Path.GetFileName(puzzleImagePath) with
+            // Hook up some OCR to do this. For now I will use a lame lookup. Or, if the solving is fast
+            // enough, just use a for loop.
+            let moves = match Path.GetFileName(puzzleImagePath) with
                            | Contains "IMG_1730" -> 15
                            | Contains "IMG_1731" -> 14
                            | Contains "IMG_1732" -> 6
@@ -81,10 +83,7 @@ let main argv =
             if argPrintRegionInfo then
                 printfn "Puzzle has %d colors and %d regions" puzzle.Colors.Length (Seq.length puzzle.Regions)
                 for region in puzzle.Regions do
-                    printf "Region %d [%d, #%s] [%d triangles]-> " region.ID region.Color region.ColorCode region.Size
-                    for adjRegion in region.AdjacentRegions do
-                        printf "%d " adjRegion
-                    printfn ""
+                    printfn "%s" <| region.ToDebugString()
 
             // Print the dot file graph version.
             if argSaveGraphImage then
@@ -96,27 +95,20 @@ let main argv =
                     graphImagePath
 
             // Solve it. Put execution in a task so we can provide a timeout.
-            let mutable executionResult = ""
             let stopwatch = Stopwatch.StartNew()
 
-            let cts = new CancellationTokenSource()
-            let solution = lazy (Solver.BruteForce puzzle maxDepth cts.Token)
-
-            let solverTask = Task.Run((fun () -> solution.Force()), cts.Token)
-            if not <| solverTask.Wait(TimeSpan.FromSeconds(kTimeoutSeconds)) then
+            let searchTask, searchResults, cts = Solver.StartBruteForceSearch puzzle moves
+            if not <| searchTask.Wait(TimeSpan.FromSeconds(kTimeoutSeconds)) then
                 cts.Cancel()
 
-            let solution = solution.Force()  // wart
             let timeResult =
-                if cts.Token.IsCancellationRequested then
-                    // Take up as much space as TimeSpan.ToString
-                    // TODO(chrsmith): Format specifier in printfn?
-                    "Timeout          "
-                else
-                    stopwatch.Elapsed.ToString()
-
-            printfn "%s\tEvaluated %d nodes (%d dupes)" timeResult solution.NodesEvaluated solution.DuplicateSteps
-            if Option.isSome solution.Moves then
-                printfn "\tSolution %O" <| Option.get solution.Moves
+                if cts.Token.IsCancellationRequested then "Timeout"
+                else sprintf "%2fs" stopwatch.Elapsed.TotalSeconds
+            let nodeStats = sprintf "(%d nodes, %d dupes)" searchResults.NodesEvaluated searchResults.DuplicateNodes
+            let solutionString =
+                if not searchResults.SolutionFound then "no solution found"
+                else "SOLVED!"
+   
+            printfn "%s\t%s %s" timeResult solutionString nodeStats
 
     0

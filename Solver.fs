@@ -35,6 +35,12 @@ let colorRegion puzzle regionId newColor =
         |> Seq.map (fun region -> region.AdjacentRegions)
         |> Set.unionMany
 
+    // Size of the new, merged region.
+    let colorMatchingNeighborSize =
+        colorMatchingNeighbors
+        |> Seq.map (fun neighborID -> puzzle.Regions.[neighborID].Size)
+        |> Seq.sum
+
     // Now we replace the target region in the puzzle.
     let newlyColoredRegion = {
         regionToColor with 
@@ -44,6 +50,7 @@ let colorRegion puzzle regionId newColor =
                 // The region being colored is a neighbor of colorMatchingNeighbors,
                 // but self-refential regions gum up the gears.
                 |> Set.remove regionId
+            Size = colorMatchingNeighborSize + puzzle.Regions.[regionId].Size
     }
 
     // Second, we remove all references to the subsumed regions. This is done
@@ -90,86 +97,190 @@ let colorRegion puzzle regionId newColor =
     }
 
 // Enumerates all valid moves from a given puzzle step.
-// seq<PuzzleStep>
-let enumerateAllMoves (puzzleStep : Kami2PuzzleStep) =
-    let colorsUsed = new HashSet<int>()
-    do puzzleStep.Regions
-       |> Map.toSeq
-       |> Seq.map snd
-       |> Seq.iter (fun region -> colorsUsed.Add(region.Color) |> ignore)
+let enumerateAllMoves (puzzleStep : Kami2PuzzleStep) : seq<PuzzleMove> =
+    let remainingColors = new HashSet<int>()
+
+    do puzzleStep.GetRegions()
+       |> Seq.iter (fun region -> remainingColors.Add(region.Color) |> ignore)
 
     let possibleMoves = 
-        puzzleStep.Regions
-        |> Map.toSeq
-        |> Seq.map (fun (_,region) ->
-            colorsUsed
+        puzzleStep.GetRegions()
+        |> Seq.map (fun region ->
+            let neighborColors = 
+                region.AdjacentRegions
+                |> Seq.map (fun neighborID -> puzzleStep.Regions.[neighborID])
+                |> Seq.map (fun neighborRegion -> neighborRegion.Color)
+                |> (fun neighborColors -> new HashSet<int>(neighborColors))
+            
+            assert (not <| neighborColors.Contains(region.Color))
+   
+            // Valid moves are from painting this region every remaining color.
+            remainingColors
+            // Don't paint the region its current color. (No op.)
             |> Seq.filter (fun colorId -> colorId <> region.Color)
+            // Only consider colors which would merge with a neighbor.
+            |> Seq.filter (fun colorId -> neighborColors.Contains(colorId))
             |> Seq.map (fun colorId -> (region.ID, colorId)))
         |> Seq.concat
+        |> Seq.sortBy (fun (region, color) -> region * 100 + color)
     possibleMoves
 
 
 // Heuristic to evaluate a potential move. A value of <= 0 means the resulting
 // puzzle is not solveable, ando therefore should not be considered. The higher
 // the value the more promising the move is.
-let evaluateMove (puzzle : Kami2PuzzleStep) (regionId, color) movesLeft =
-    let regionBeingColored = puzzle.Regions.[regionId]
+let evaluateMove (puzzleStep : Kami2PuzzleStep) (regionToColor, newColor) movesLeft =
+    // If there are more colors remaining than moves, you can't paint them all
+    // in time.
+    let remainingColors = new HashSet<int>()
+    do puzzleStep.GetRegions()
+       |> Seq.iter (fun region -> remainingColors.Add(region.Color) |> ignore)
+    let possibleToBeSolved = remainingColors.Count <= movesLeft + 1
+
+    let regionBeingColored = puzzleStep.Regions.[regionToColor]
+    // Assert we have at least one neighbor of the region being colored.
+    // WARNING: Some puzzles have singleton regions. So this isn't universally true.
+    assert ((Set.count regionBeingColored.AdjacentRegions) > 0)
+
     let (neighborsColored, totalTrianglesColored) =
         regionBeingColored.AdjacentRegions
         |> Set.toSeq
-        |> Seq.map (fun regionId -> puzzle.Regions.[regionId])
+        |> Seq.map (fun regionId -> puzzleStep.Regions.[regionId])
         |> Seq.fold (fun (neighborsColored, totalTrianglesColored) neighbor ->
-            if neighbor.Color = color then
+            if neighbor.Color = newColor then
                 (neighborsColored + 1, totalTrianglesColored + neighbor.Size)
             else
                 (neighborsColored, totalTrianglesColored)) (0, 0)
 
-    10 * neighborsColored + totalTrianglesColored
-
-
-let mutable bruteForceSteps = 0
-let mutable duplicateSteps = 0
-let mutable knownSteps = new HashSet<int>()
-let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList currentDepth maxDepth (token : CancellationToken) =
-    bruteForceSteps <- bruteForceSteps + 1
-    let stepHashCode = puzzleStep.GetHashCode()
-
-    if token.IsCancellationRequested then None
-    elif knownSteps.Contains(stepHashCode) then duplicateSteps <- duplicateSteps + 1; None
-    elif puzzleStep.IsSolved then         Some(movesList)
-    elif currentDepth >= maxDepth then    None
+    if possibleToBeSolved && neighborsColored > 0 then
+        assert (neighborsColored > 0)
+        assert (totalTrianglesColored > 0)
+        20 * neighborsColored + totalTrianglesColored
     else
-        knownSteps.Add(stepHashCode) |> ignore
+        0
+
+type StepResult = Cancelled | Culled | Duplicate | Solved of PuzzleMove list | OutOfMoves
+
+let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList movesRemaining (state : SearchResults) =
+    let puzzleStepHashCode = puzzleStep.JankHash()
+    state.IncrementNodesEvaluated()
+
+    let onCorrectPath, movesOnCorrectPath, nextMoveName =
+        match movesList with
+        | []                 -> true, 0, "first"
+        | [(22, 1)]          -> true, 1, "second"
+        | [(22, 3); (22, 1)] -> true, 2, "third"
+        | [(22, 4); (22, 3); (22, 1)] -> true, 3, "fourth"
+        | [(22, 1); (22, 4); (22, 3); (22, 1)] -> true, 4, "fifth"
+        | [(22, 0); (22, 1); (22, 4); (22, 3); (22, 1)] -> true, 5, "sixth"
+        | [(22, 2); (22, 0); (22, 1); (22, 4); (22, 3); (22, 1)] -> true, 6, "seventh"
+        | _                  -> false, 0, "NA"
+(*
+    if movesOnCorrectPath = 6 then
+        printfn "Final move? Should be solved. Right?"
+        puzzleStep.DebugPrint()
+        printfn "* * * * * * * * * * * * * * *"
+    *)
+
+    // See if we can cull the search at this point.
+    // User cancelled the search task?
+    if state.CancellationToken.IsCancellationRequested then
+        Cancelled
+    ////
+    // Debugging speed up.
+    elif movesOnCorrectPath = 0 && not onCorrectPath then
+        Cancelled
+    ////
+    // Have we already seen this puzzle step before?
+    elif state.KnownNodes.Contains(puzzleStepHashCode) then
+        //printfn "Found dupe node with hash code %d" puzzleStepHashCode
+        state.IncrementDupNodes()
+        Duplicate
+    // Is the puzzle actually solved?
+    elif puzzleStep.IsSolved then
+        // We built up the move list "backwards" from what you actually have to
+        // do...
+        Solved(List.rev movesList)
+    // Ran out of moves? (Hopefully we never hit this, as we cull unsolveable
+    // puzzles earlier in the search tree.)
+    elif movesRemaining <= 0 then
+        OutOfMoves
+    // Otherwise, try making a move and recursing.
+    else
+        // Since we are in the process of evaluating this node, add it to the
+        // known nodes list. So a peer / parent doesn't reevaluate.
+        state.KnownNodes.Add(puzzleStepHashCode) |> ignore
+        (*if puzzleStepHashCode = 14891 then
+            printfn "Emitting first node that will become a dupe: %A" movesList
+            puzzleStep.DebugPrint()*)
+
+
+        let candidateMoves =
+                enumerateAllMoves puzzleStep
+                // Evaluate each of these potential moves.
+                |> Seq.map (fun (regionToColor, newColor) ->
+                    let evaluation = evaluateMove puzzleStep (regionToColor, newColor) movesRemaining
+                    (regionToColor, newColor, evaluation))
+                // Filter out the ones that are unsolveable.
+                |> Seq.filter (fun (_,_,eval) -> eval > 0)
+        assert ((Seq.length candidateMoves) > 0)
+        (*
+        if onCorrectPath then
+            printfn "On the Correct Path. %d moves left:" movesRemaining
+            puzzleStep.DebugPrint()
+            printfn "There are %d candidates for %s move on correct path." (Seq.length candidateMoves) nextMoveName*)
+
         let foundSolution =
             enumerateAllMoves puzzleStep
+            // Evaluate each of these potential moves.
             |> Seq.map (fun (regionToColor, newColor) ->
-                let evaluation = evaluateMove puzzleStep (regionToColor, newColor) (maxDepth - currentDepth)
+                let evaluation = evaluateMove puzzleStep (regionToColor, newColor) movesRemaining
                 (regionToColor, newColor, evaluation))
+            // Filter out the ones that are unsolveable.
             |> Seq.filter (fun (_,_,eval) -> eval > 0)
-            |> Seq.sortByDescending (fun (_,_,eval) -> eval)
+            // Sort best to worst.
+            // |> Seq.sortByDescending (fun (_,_,eval) -> eval)
+            // Recurse.
             |> Seq.map (fun (regionToColor, newColor, _) ->
                 let updatedPuzzle = colorRegion puzzleStep regionToColor newColor
-                bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (currentDepth + 1) maxDepth token)
-            |> Seq.tryFind (fun results -> Option.isSome results)
+                assert (updatedPuzzle.JankHash() <> puzzleStepHashCode)
+
+                let result = bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (movesRemaining - 1) state
+                result)
+            // For each of these potential moves, did we find a solution?
+            |> Seq.tryFind (function Solved(_) -> true | _ -> false)
         match foundSolution with
-        | Some(sln) -> sln
-        | None      -> None
+        | Some(x) -> x
+        | None    -> Culled
         
 
-// Returns the list of (regionID, colorID) moves to make if a solution is found.
-let BruteForce (kami2Puzzle : Kami2Puzzle) maxDepth (token : CancellationToken) =
+// Returns the list of (regionID, colorID) moves to make if a solution is found. Mutable SearchResults object is
+// built up during execution. (Code smell. Perhaps returned from a call to beginSearch?
+let StartBruteForceSearch (kami2Puzzle : Kami2Puzzle) movesRemaining =
+    let cts = new CancellationTokenSource()
+
     let startingPuzzle : Kami2PuzzleStep = {
         Regions = kami2Puzzle.Regions
                   |> Seq.map (fun region -> region.ID, region)
                   |> Map.ofSeq
     }
 
-    bruteForceSteps <- 0
-    duplicateSteps <- 0
-    knownSteps <- new HashSet<int>()
-    let result = bruteForceStep startingPuzzle [] 0 maxDepth token
-    {
-        NodesEvaluated = bruteForceSteps
-        DuplicateSteps = duplicateSteps
-        Moves = result |> Option.map (fun moves -> List.rev moves)
+    // Results object that will be fleshed out while the search is being conducted.
+    // Is this going to break if converted to be multi-threaded? Absolutely.
+    let searchResults = {
+        NodesEvaluated = 0
+        DuplicateNodes = 0
+        KnownNodes = new HashSet<string>()
+        CancellationToken = cts.Token
+        Moves = []
     }
+
+    let searchFunction() = 
+        let result = bruteForceStep startingPuzzle [] movesRemaining searchResults
+        match result with
+        | Solved(moveList) -> searchResults.Moves <- moveList
+        | _ -> ()
+    
+    printfn "..."  // DEBUGGING
+    let searchTask = Task.Run(searchFunction, cts.Token)
+    searchTask, searchResults, cts
