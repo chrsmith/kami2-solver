@@ -28,16 +28,16 @@ let solidColors = [|
 
 // Values in pixels for the dimensions of things. These are hard-coded
 // to the images I'm generating on my phone, which might vary between
-// iPhone models. (Sourced from 1242 × 2208.)
-let kImageWidth = 1242.0f
-let kImageHeight = 2208.0f
+// iPhone models. (Sourced from 1242 × 2208, but exported as JPG at 665x1182.)
+let kImageWidth = 665.0f
+let kImageHeight = 1182.0f
+// Height of the "footer" with the color palet, moves remaining, etc.
+let kGameFooter = 110.0f
+// Width of the color swatches widget in the bottom right.
+let kColorPaletWidth = 400.0f
 
-let kGameFooter = 206.0f  // Size in px of the game's footer
 let kGridWidth = kImageWidth
 let kGridHeight = kImageHeight - kGameFooter
-
-// Dimensions of the color swatches in the bottom right.
-let kColorPaletWidth = 745.0f
 let kColorPaletXOffset = kGridWidth - kColorPaletWidth
 
 // Width/height of the triangle grid.
@@ -297,7 +297,7 @@ let ExtractPuzzle imageFilePath saveDebugImage =
                     RegionBuilder.ID = knownRegions.Count
                     RegionBuilder.Color = triangleColorIdx
                     RegionBuilder.Position = (col, row)
-                    RegionBuilder.ColorCode = sprintf "#%x%x%x" triangleColor.Red triangleColor.Green triangleColor.Blue
+                    RegionBuilder.ColorCode = sprintf "#%02x%02x%02x" triangleColor.Red triangleColor.Green triangleColor.Blue
                     RegionBuilder.Size = 0  // Updated in flood fill.
                     RegionBuilder.AdjacentRegions = new HashSet<int>()
                 }

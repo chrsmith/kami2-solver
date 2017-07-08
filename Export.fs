@@ -10,7 +10,7 @@ open Kami2Solver.Types
 
 
 // Size of annotations in the debug image.
-let kAnnotationSize = 22.0f
+let kAnnotationSize = 16.0f
 
 
 // Kami2 puzzle image with annotations to aid in debugging.
@@ -20,10 +20,10 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
                                    SKImageInfo.PlatformColorType,
                                    SKAlphaType.Premul)
     let canvas = surface.Canvas
-    let paint = new SKPaint(TextSize = 80.0f,
+    let paint = new SKPaint(TextSize = 40.0f,
                             IsAntialias = true,
                             Color = SKColor(0uy, 0uy, 0uy),
-                            StrokeWidth = 5.0f)
+                            StrokeWidth = 2.0f)
 
     do canvas.DrawBitmap(originalImage, 0.0f, 0.0f, paint)
 
@@ -47,7 +47,7 @@ type AnalysisDebugImage(originalImage : SKBitmap) =
 
     member this.AddText(text : string, x : float32, y : float32, color) =
         // Shift a little bit so it doesn't overlap.
-        let x = x - 32.0f
+        let x = x - 16.0f
         let y = y + 16.0f;
 
         paint.Color <- color
