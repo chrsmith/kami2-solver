@@ -61,7 +61,7 @@ let tryGetPuzzleDataMetadata input : (int * int * int) option =
 
 
 // Timeout in seconds to wait while trying to solve a puzzle.
-let kTimeoutSeconds = 1.0 * 60.0
+let kTimeoutSeconds = 60.0
 
 
 [<EntryPoint>]
@@ -102,37 +102,39 @@ let main argv =
             printf "Solving puzzle '%s'...\t" puzzleName
 
             let puzzle = Analysis.ExtractPuzzle puzzleImagePath argSaveMarkupImage
+            if puzzle.Colors.Length <= 1 then
+                printfn "ERROR: Unable to determine puzzle colors."
+            else
+                // Print region information to the console.
+                if argPrintRegionInfo then
+                    printfn "Puzzle has %d colors and %d regions" puzzle.Colors.Length (Seq.length puzzle.Regions)
+                    for region in puzzle.Regions do
+                        printfn "%s" <| region.ToDebugString()
 
-            // Print region information to the console.
-            if argPrintRegionInfo then
-                printfn "Puzzle has %d colors and %d regions" puzzle.Colors.Length (Seq.length puzzle.Regions)
-                for region in puzzle.Regions do
-                    printfn "%s" <| region.ToDebugString()
+                // Print the dot file graph version.
+                if argSaveGraphImage then
+                    let sourceImageDir = Path.GetDirectoryName(puzzleImagePath)
+                    let sourceImageName = Path.GetFileNameWithoutExtension(puzzleImagePath)
+                    let graphImagePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.png")
+                    Export.RenderAsGraph
+                        puzzle.Regions
+                        graphImagePath
 
-            // Print the dot file graph version.
-            if argSaveGraphImage then
-                let sourceImageDir = Path.GetDirectoryName(puzzleImagePath)
-                let sourceImageName = Path.GetFileNameWithoutExtension(puzzleImagePath)
-                let graphImagePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.png")
-                Export.RenderAsGraph
-                    puzzle.Regions
-                    graphImagePath
+                // Solve!
+                let stopwatch = Stopwatch.StartNew()
 
-            // Solve!
-            let stopwatch = Stopwatch.StartNew()
+                let searchTask, searchResults, cts = Solver.StartBruteForceSearch puzzle moves
+                if not <| searchTask.Wait(TimeSpan.FromSeconds(kTimeoutSeconds)) then
+                    cts.Cancel()
 
-            let searchTask, searchResults, cts = Solver.StartBruteForceSearch puzzle moves
-            if not <| searchTask.Wait(TimeSpan.FromSeconds(kTimeoutSeconds)) then
-                cts.Cancel()
-
-            let timeResult =
-                if cts.Token.IsCancellationRequested then "Timeout"
-                else sprintf "%.2fs" stopwatch.Elapsed.TotalSeconds
-            let nodeStats = sprintf "(%d nodes, %d dupes)" searchResults.NodesEvaluated searchResults.DuplicateNodes
-            let solutionString =
-                if not searchResults.SolutionFound then "no solution found"
-                else sprintf "SOLVED! %A" searchResults.Moves
-   
-            printfn "%s\t%s\t%s" timeResult nodeStats solutionString
+                let timeResult =
+                    if cts.Token.IsCancellationRequested then "Timeout"
+                    else sprintf "%.2fs" stopwatch.Elapsed.TotalSeconds
+                let nodeStats = sprintf "(%d nodes, %d dupes)" searchResults.NodesEvaluated searchResults.DuplicateNodes
+                let solutionString =
+                    if not searchResults.SolutionFound then "no solution found"
+                    else sprintf "SOLVED! %A" searchResults.Moves
+       
+                printfn "%s\t%s\t%s" timeResult nodeStats solutionString
 
     0

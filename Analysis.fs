@@ -169,7 +169,7 @@ let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
             let getColorAtIdx idx =
                 let (x, _) = getPuzzleColorPoint idx numColors
                 // Adjust the X value so it isn't inbetween two different colors.
-                let x = x - 20.0f
+                let x = x - 10.0f  // BUG: Hard-coded relative to image size.
                 // Adjust the Y value so that debugging annotations don't overlap.
                 let y = kGridHeight + (kGameFooter / 4.0f) * (float32 (5 - numColors)) + 40.0f
                 let color = getColorAverage bitmap x y
@@ -177,7 +177,10 @@ let AnalyzePuzzleImage (bitmap : SKBitmap) (debugImage : AnalysisDebugImage) =
                 debugImage.AddCircleOutline(x, y, solidColors.[numColors])
                 color
             Array.init numColors getColorAtIdx)
-        |> Seq.find allUnique
+        |> Seq.tryFind allUnique
+        |> (function
+            | Some(uniqueColors) -> uniqueColors
+            | None -> [| kMagenta (* couldn't determine colors *) |])
 
     // Get the inferred index of the color correspoding to the triangle at the
     // given column and row.
