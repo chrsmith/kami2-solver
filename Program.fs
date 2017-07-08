@@ -3,6 +3,7 @@ module Kami2Solver.Program
 open System
 open System.Diagnostics
 open System.IO
+open System.Text.RegularExpressions
 open System.Threading
 open System.Threading.Tasks
 
@@ -38,9 +39,29 @@ let (|Contains|_|) (p:string) (s:string) =
     if s.Contains(p) then Some()
     else None
 
+ 
+// Extract puzzle metadata encoded in the file name. Returns:
+// (set index, puzzle index, number of moves). User-generated puzzles have
+// 0 for the set index.
+let tryGetPuzzleDataMetadata input : (int * int * int) option =
+    let m1 = Regex.Match(input, "set-(\d+)-puzzle-(\d+)-moves-(\d+).jpg")
+    let m2 = Regex.Match(input, "user-generated-(\d+)-moves-(\d+).jpg")
+    if m1.Success then
+        Some(
+            m1.Groups.[1].Value |> int,
+            m1.Groups.[2].Value |> int,
+            m1.Groups.[3].Value |> int)
+    elif m2.Success then
+        Some(
+            0,
+            m2.Groups.[1].Value |> int,
+            m2.Groups.[2].Value |> int)
+    else
+        None
+
 
 // Timeout in seconds to wait while trying to solve a puzzle.
-let kTimeoutSeconds = 2.0 * 60.0
+let kTimeoutSeconds = 1.0 * 60.0
 
 
 [<EntryPoint>]
@@ -58,28 +79,31 @@ let main argv =
 
     let puzzleImages = Directory.GetFiles(argPuzzlesDir, "*.jpg")
     for puzzleImagePath in puzzleImages do
-        let solvePuzzle = match argPuzzleName with
-                          | None -> true
-                          | Some(name) -> puzzleImagePath.Contains(name)
-        if solvePuzzle then
-            printf "Solving puzzle [%s]...\t" (Path.GetFileName(puzzleImagePath))
+
+        // TODO(chrsmith): The puzzle image has the number of steps (upper bound) required to solve.
+        // Hook up some OCR to do this. For now I just put the expected number of moves in the file
+        // name, like a scrub.
+        let puzzleFileName = Path.GetFileName(puzzleImagePath)
+        let puzzleName, moves =
+            match tryGetPuzzleDataMetadata puzzleFileName with
+            | Some(0, puzzle, moves) -> ((sprintf "user generated #%d (%d)" puzzle moves), moves)
+            | Some(set, puzzle, moves) -> ((sprintf "set %d #%d (%d)" set puzzle moves), moves)
+            | None -> null, 0
+
+        let shouldSolvePuzzle =
+            if puzzleName = null then 
+                false
+            elif Option.isSome argPuzzleName then
+                puzzleFileName.Contains(Option.get argPuzzleName)
+            else
+                true
+
+        if shouldSolvePuzzle then
+            printf "Solving puzzle '%s'...\t" puzzleName
 
             let puzzle = Analysis.ExtractPuzzle puzzleImagePath argSaveMarkupImage
-            // TODO(chrsmith): The puzzle image has the number of steps (upper bound) required to solve.
-            // Hook up some OCR to do this. For now I will use a lame lookup. Or, if the solving is fast
-            // enough, just use a for loop.
-            let moves = match Path.GetFileName(puzzleImagePath) with
-                           | Contains "IMG_1730" -> 15
-                           | Contains "IMG_1731" -> 14
-                           | Contains "IMG_1732" -> 7
-                           | Contains "IMG_1733" -> 10
-                           | Contains "IMG_1735" -> 2
-                           | Contains "IMG_1740" -> 2
-                           | Contains "IMG_1741" -> 10
-                           | Contains "IMG_1742" -> 12
-                           | Contains "IMG_1743" -> 4
-                           | _ -> 5  // Default
 
+            // Print region information to the console.
             if argPrintRegionInfo then
                 printfn "Puzzle has %d colors and %d regions" puzzle.Colors.Length (Seq.length puzzle.Regions)
                 for region in puzzle.Regions do
@@ -94,7 +118,7 @@ let main argv =
                     puzzle.Regions
                     graphImagePath
 
-            // Solve it. Put execution in a task so we can provide a timeout.
+            // Solve!
             let stopwatch = Stopwatch.StartNew()
 
             let searchTask, searchResults, cts = Solver.StartBruteForceSearch puzzle moves
@@ -103,12 +127,12 @@ let main argv =
 
             let timeResult =
                 if cts.Token.IsCancellationRequested then "Timeout"
-                else sprintf "%2fs" stopwatch.Elapsed.TotalSeconds
+                else sprintf "%.2fs" stopwatch.Elapsed.TotalSeconds
             let nodeStats = sprintf "(%d nodes, %d dupes)" searchResults.NodesEvaluated searchResults.DuplicateNodes
             let solutionString =
                 if not searchResults.SolutionFound then "no solution found"
                 else sprintf "SOLVED! %A" searchResults.Moves
    
-            printfn "%s\t%s %s" timeResult solutionString nodeStats
+            printfn "%s\t%s\t%s" timeResult nodeStats solutionString
 
     0
