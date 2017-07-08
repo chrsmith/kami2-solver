@@ -165,41 +165,17 @@ let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList movesRemaining (
     let puzzleStepHashCode = puzzleStep.JankHash()
     state.IncrementNodesEvaluated()
 
-    let onCorrectPath, movesOnCorrectPath, nextMoveName =
-        match movesList with
-        | []                 -> true, 0, "first"
-        | [(22, 1)]          -> true, 1, "second"
-        | [(22, 3); (22, 1)] -> true, 2, "third"
-        | [(22, 4); (22, 3); (22, 1)] -> true, 3, "fourth"
-        | [(22, 1); (22, 4); (22, 3); (22, 1)] -> true, 4, "fifth"
-        | [(22, 0); (22, 1); (22, 4); (22, 3); (22, 1)] -> true, 5, "sixth"
-        | [(22, 2); (22, 0); (22, 1); (22, 4); (22, 3); (22, 1)] -> true, 6, "seventh"
-        | _                  -> false, 0, "NA"
-(*
-    if movesOnCorrectPath = 6 then
-        printfn "Final move? Should be solved. Right?"
-        puzzleStep.DebugPrint()
-        printfn "* * * * * * * * * * * * * * *"
-    *)
-
     // See if we can cull the search at this point.
     // User cancelled the search task?
     if state.CancellationToken.IsCancellationRequested then
         Cancelled
-    ////
-    // Debugging speed up.
-    elif movesOnCorrectPath = 0 && not onCorrectPath then
-        Cancelled
-    ////
     // Have we already seen this puzzle step before?
     elif state.KnownNodes.Contains(puzzleStepHashCode) then
-        //printfn "Found dupe node with hash code %d" puzzleStepHashCode
         state.IncrementDupNodes()
         Duplicate
     // Is the puzzle actually solved?
     elif puzzleStep.IsSolved then
-        // We built up the move list "backwards" from what you actually have to
-        // do...
+        // We built up the move list "backwards", so reverse to make it right.
         Solved(List.rev movesList)
     // Ran out of moves? (Hopefully we never hit this, as we cull unsolveable
     // puzzles earlier in the search tree.)
@@ -210,53 +186,31 @@ let rec bruteForceStep (puzzleStep : Kami2PuzzleStep) movesList movesRemaining (
         // Since we are in the process of evaluating this node, add it to the
         // known nodes list. So a peer / parent doesn't reevaluate.
         state.KnownNodes.Add(puzzleStepHashCode) |> ignore
-        (*if puzzleStepHashCode = 14891 then
-            printfn "Emitting first node that will become a dupe: %A" movesList
-            puzzleStep.DebugPrint()*)
 
+        enumerateAllMoves puzzleStep
+        // Evaluate each of these potential moves.
+        |> Seq.map (fun (regionToColor, newColor) ->
+            let evaluation = evaluateMove puzzleStep (regionToColor, newColor) movesRemaining
+            (regionToColor, newColor, evaluation))
+        // Filter out the ones that are unsolveable.
+        |> Seq.filter (fun (_,_,eval) -> eval > 0)
+        // Sort best to worst.
+        |> Seq.sortByDescending (fun (_,_,eval) -> eval)
+        // Recurse.
+        |> Seq.map (fun (regionToColor, newColor, _) ->
+            let updatedPuzzle = colorRegion puzzleStep regionToColor newColor
+            assert (updatedPuzzle.JankHash() <> puzzleStepHashCode)
 
-        let candidateMoves =
-                enumerateAllMoves puzzleStep
-                // Evaluate each of these potential moves.
-                |> Seq.map (fun (regionToColor, newColor) ->
-                    let evaluation = evaluateMove puzzleStep (regionToColor, newColor) movesRemaining
-                    (regionToColor, newColor, evaluation))
-                // Filter out the ones that are unsolveable.
-                |> Seq.filter (fun (_,_,eval) -> eval > 0)
-        assert ((Seq.length candidateMoves) > 0)
-        (*
-        if onCorrectPath then
-            printfn "On the Correct Path. %d moves left:" movesRemaining
-            puzzleStep.DebugPrint()
-            printfn "There are %d candidates for %s move on correct path." (Seq.length candidateMoves) nextMoveName*)
+            let result = bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (movesRemaining - 1) state
+            result)
+        // For each of these potential moves, did we find a solution?
+        |> Seq.tryFind (function Solved(moves) -> true | _ -> false)
+        |> (function Some(sln) -> sln | None -> Culled)
 
-        let foundSolution =
-            enumerateAllMoves puzzleStep
-            // Evaluate each of these potential moves.
-            |> Seq.map (fun (regionToColor, newColor) ->
-                let evaluation = evaluateMove puzzleStep (regionToColor, newColor) movesRemaining
-                (regionToColor, newColor, evaluation))
-            // Filter out the ones that are unsolveable.
-            |> Seq.filter (fun (_,_,eval) -> eval > 0)
-            // Sort best to worst.
-            // |> Seq.sortByDescending (fun (_,_,eval) -> eval)
-            // Recurse.
-            |> Seq.map (fun (regionToColor, newColor, _) ->
-                let updatedPuzzle = colorRegion puzzleStep regionToColor newColor
-                assert (updatedPuzzle.JankHash() <> puzzleStepHashCode)
-
-                let result = bruteForceStep updatedPuzzle ((regionToColor, newColor) :: movesList) (movesRemaining - 1) state
-                result)
-            // For each of these potential moves, did we find a solution?
-            |> Seq.tryFind (function Solved(_) -> true | _ -> false)
-        match foundSolution with
-        | Some(x) -> x
-        | None    -> Culled
-        
 
 // Returns the list of (regionID, colorID) moves to make if a solution is found. Mutable SearchResults object is
 // built up during execution. (Code smell. Perhaps returned from a call to beginSearch?
-let StartBruteForceSearch (kami2Puzzle : Kami2Puzzle) movesRemaining =
+let StartBruteForceSearch (kami2Puzzle : Kami2Puzzle) moves =
     let cts = new CancellationTokenSource()
 
     let startingPuzzle : Kami2PuzzleStep = {
@@ -276,11 +230,10 @@ let StartBruteForceSearch (kami2Puzzle : Kami2Puzzle) movesRemaining =
     }
 
     let searchFunction() = 
-        let result = bruteForceStep startingPuzzle [] movesRemaining searchResults
+        let result = bruteForceStep startingPuzzle [] (moves + 1) searchResults
         match result with
         | Solved(moveList) -> searchResults.Moves <- moveList
         | _ -> ()
-    
-    printfn "..."  // DEBUGGING
+
     let searchTask = Task.Run(searchFunction, cts.Token)
     searchTask, searchResults, cts

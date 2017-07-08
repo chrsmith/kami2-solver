@@ -40,7 +40,7 @@ let (|Contains|_|) (p:string) (s:string) =
 
 
 // Timeout in seconds to wait while trying to solve a puzzle.
-let kTimeoutSeconds = 60.0 * 30.0  // Half an hour :(
+let kTimeoutSeconds = 2.0 * 60.0
 
 
 [<EntryPoint>]
@@ -71,7 +71,7 @@ let main argv =
             let moves = match Path.GetFileName(puzzleImagePath) with
                            | Contains "IMG_1730" -> 15
                            | Contains "IMG_1731" -> 14
-                           | Contains "IMG_1732" -> 6
+                           | Contains "IMG_1732" -> 7
                            | Contains "IMG_1733" -> 10
                            | Contains "IMG_1735" -> 2
                            | Contains "IMG_1740" -> 2
@@ -107,7 +107,7 @@ let main argv =
             let nodeStats = sprintf "(%d nodes, %d dupes)" searchResults.NodesEvaluated searchResults.DuplicateNodes
             let solutionString =
                 if not searchResults.SolutionFound then "no solution found"
-                else "SOLVED!"
+                else sprintf "SOLVED! %A" searchResults.Moves
    
             printfn "%s\t%s %s" timeResult solutionString nodeStats
 
