@@ -23,6 +23,7 @@ type CommandLineArguments =
     | PrintRegionInfo
     | SaveMarkupImage
     | SaveGraphImage
+    | PrintSolution
 with
     interface IArgParserTemplate with
         member s.Usage =
@@ -32,6 +33,7 @@ with
             | PrintRegionInfo    -> "print region information to STDOUT"
             | SaveMarkupImage    -> "save marked up puzzle image"
             | SaveGraphImage     -> "save graph output"
+            | PrintSolution      -> "print the puzzle solution to STDOUT"
 
 
 // Active pattern for matching if an input string contains a substring.
@@ -76,6 +78,7 @@ let main argv =
     let argPrintRegionInfo = results.TryGetResult(<@ PrintRegionInfo @>) |> Option.isSome
     let argSaveMarkupImage =  results.TryGetResult(<@ SaveMarkupImage @>) |> Option.isSome
     let argSaveGraphImage =  results.TryGetResult(<@ SaveGraphImage @>) |> Option.isSome
+    let argPrintSolution = results.TryGetResult(<@ PrintSolution @>) |> Option.isSome
 
     let puzzleImages = Directory.GetFiles(argPuzzlesDir, "*.jpg")
     for puzzleImagePath in puzzleImages do
@@ -133,8 +136,10 @@ let main argv =
                 let nodeStats = sprintf "(%d nodes, %d dupes)" searchResults.NodesEvaluated searchResults.DuplicateNodes
                 let solutionString =
                     if not searchResults.SolutionFound then "no solution found"
-                    else sprintf "SOLVED! %A" searchResults.Moves
+                    else sprintf "SOLVED!"
        
                 printfn "%s\t%s\t%s" timeResult nodeStats solutionString
+                if argPrintSolution then
+                    printfn "%A" searchResults.Moves
 
     0
