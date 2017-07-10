@@ -11,8 +11,6 @@ perform to solve the puzzle.
 Details on the algorithm and approach can be found on my blog at:
 [completely-unique.com](http://completely-unique.com).
 
-:construction: **Not Yet Finished** :construction:
-
 - [Part 1](http://completely-unique.com/posts/kami2-solver-part-1)
 - [Part 2](http://completely-unique.com/posts/kami2-solver-part-2)
 
@@ -20,6 +18,8 @@ Details on the algorithm and approach can be found on my blog at:
 
 - "Textured" colors are not supported. (Only seen in some user-generated
   puzzles.)
+- It cannot handle puzzles with 10+ moves. In theory it will find a
+  solution eventually, but obviously a better algorithm is needed.
 
 ## License
 
