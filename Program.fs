@@ -24,6 +24,7 @@ type CommandLineArguments =
     | SaveMarkupImage
     | SaveGraphImage
     | PrintSolution
+    | SearchTimeout of int
 with
     interface IArgParserTemplate with
         member s.Usage =
@@ -34,6 +35,7 @@ with
             | SaveMarkupImage    -> "save marked up puzzle image"
             | SaveGraphImage     -> "save graph output"
             | PrintSolution      -> "print the puzzle solution to STDOUT"
+            | SearchTimeout _    -> "search timeout in seconds"
 
 
 // Active pattern for matching if an input string contains a substring.
@@ -62,10 +64,6 @@ let tryGetPuzzleDataMetadata input : (int * int * int) option =
         None
 
 
-// Timeout in seconds to wait while trying to solve a puzzle.
-let kTimeoutSeconds = 60.0
-
-
 [<EntryPoint>]
 let main argv =
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
@@ -79,6 +77,8 @@ let main argv =
     let argSaveMarkupImage =  results.TryGetResult(<@ SaveMarkupImage @>) |> Option.isSome
     let argSaveGraphImage =  results.TryGetResult(<@ SaveGraphImage @>) |> Option.isSome
     let argPrintSolution = results.TryGetResult(<@ PrintSolution @>) |> Option.isSome
+
+    let timeout = results.GetResult(<@ SearchTimeout @>, 10) |> float
 
     let puzzleImages = Directory.GetFiles(argPuzzlesDir, "*.jpg")
     for puzzleImagePath in puzzleImages do
@@ -127,7 +127,7 @@ let main argv =
                 let stopwatch = Stopwatch.StartNew()
 
                 let searchTask, searchResults, cts = Solver.StartBruteForceSearch puzzle moves
-                if not <| searchTask.Wait(TimeSpan.FromSeconds(kTimeoutSeconds)) then
+                if not <| searchTask.Wait(TimeSpan.FromSeconds(timeout)) then
                     cts.Cancel()
 
                 let timeResult =
