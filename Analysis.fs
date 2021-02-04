@@ -29,10 +29,10 @@ let solidColors = [|
 // Values in pixels for the dimensions of things. These are hard-coded
 // to the images I'm generating on my phone, which might vary between
 // iPhone models. (Sourced from 1242 × 2208, but exported as JPG at 665x1182.)
-let kImageWidth = 665.0f
-let kImageHeight = 1182.0f
+let kImageWidth = 1080.0f
+let kImageHeight = 2267.0f
 // Height of the "footer" with the color palet, moves remaining, etc.
-let kGameFooter = 110.0f
+let kGameFooter = 132.0f
 // Width of the color swatches widget in the bottom right.
 let kColorPaletWidth = 400.0f
 

@@ -116,12 +116,14 @@ let main argv =
 
                 // Print the dot file graph version.
                 if argSaveGraphImage then
+                    // Getting "Unhandled exception. System.ComponentModel.Win32Exception"?
+                    // You probably need to install `dot`.
                     let sourceImageDir = Path.GetDirectoryName(puzzleImagePath)
                     let sourceImageName = Path.GetFileNameWithoutExtension(puzzleImagePath)
                     let graphImagePath = Path.Combine(sourceImageDir, sourceImageName + ".graph.png")
                     Export.RenderAsGraph
                         puzzle.Regions
-                        graphImagePath
+                        "graph-output-png"
 
                 // Solve!
                 let stopwatch = Stopwatch.StartNew()
